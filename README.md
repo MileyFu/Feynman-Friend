@@ -32,7 +32,7 @@ This project uses the **Prompt API** (via `LanguageModel.create()`) to power the
 Judges can test this extension by following these steps:
 
 1.  **Check Requirements:** Ensure you have a compatible device and Chrome version that supports the Built-in AI APIs (as per the 2025 challenge documentation).
-2.  **Download:** Download this repository. You can either use `git clone https://github.com/MileyFu/feynman-friend-extension.git` or click the green `<> Code` button -> **Download ZIP**.
+2.  **Download:** Download this repository. You can either use `git clone git clone https://github.com/MileyFu/Feynman-Friend.git` or click the green `<> Code` button -> **Download ZIP**.
 3.  **Unzip:** If you downloaded a ZIP, unzip the folder to a permanent location on your computer.
 4.  **Load Extension in Chrome:**
     * Open Chrome and navigate to `chrome://extensions`.

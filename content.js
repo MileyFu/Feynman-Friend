@@ -99,4 +99,119 @@ function createFloatingWindow() {
   input.rows = 2;
   const button = document.createElement("button");
   button.textContent = "Send";
-  button.disabled
+  button.disabled = true;
+  button.style.marginLeft = "8px";
+  button.style.padding = "8px 12px";
+  button.style.border = "none";
+  button.style.borderRadius = "5px";
+  button.style.background = "#8ab4f8";
+  button.style.color = "#202124";
+  button.style.cursor = "pointer";
+
+  form.appendChild(input);
+  form.appendChild(button);
+  container.appendChild(form);
+
+  form.addEventListener("submit", handleUserResponse);
+
+  document.body.appendChild(container);
+
+  return { chatHistory, input, button };
+}
+
+function appendMessage(chatHistory, role, text) {
+    const messageDiv = document.createElement('div');
+    messageDiv.style.lineHeight = "1.5";
+    const roleStrong = document.createElement('strong');
+    roleStrong.textContent = role === 'user' ? 'You: ' : 'Feynman Friend: ';
+    messageDiv.appendChild(roleStrong);
+    messageDiv.append(text);
+    chatHistory.appendChild(messageDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+    return messageDiv;
+}
+
+async function handleUserResponse(event) {
+  event.preventDefault();
+  const form = event.target;
+  const input = form.querySelector("textarea");
+  const button = form.querySelector("button");
+  const chatHistory = document.getElementById("feynman-chat-history");
+  
+  const userText = input.value.trim();
+  if (userText === "" || !feynmanSession) return;
+
+  appendMessage(chatHistory, 'user', userText);
+  input.value = "";
+  input.disabled = true;
+  button.disabled = true;
+  
+  const aiMessageDiv = appendMessage(chatHistory, 'ai', '...');
+
+  try {
+    const stream = feynmanSession.promptStreaming(userText);
+    let fullResponse = "";
+    for await (const chunk of stream) {
+      fullResponse += chunk;
+      aiMessageDiv.textContent = `Feynman Friend: ${fullResponse}`;
+    }
+  } catch(err) {
+     aiMessageDiv.textContent = `Feynman Friend: Sorry, an error occurred: ${err.message}`;
+  } finally {
+    input.disabled = false;
+    button.disabled = false;
+    input.focus();
+  }
+}
+
+window.addEventListener("message", async (event) => {
+  // *** THIS IS THE TYPO I FIXED ***
+  if (event.source !== window || event.data.type !== "START_FEYNMAN_SESSION") {
+    return;
+  }
+
+  const text = event.data.text;
+  const { chatHistory, input, button } = createFloatingWindow();
+
+  try {
+    const availability = await isAiAvailable();
+
+    // FIXED CHECK:
+    // According to the docs, we can proceed if the status is anything
+    // other than 'unavailable'. The create() call will trigger a download
+    // if the status is 'downloadable' or 'downloading'.
+    if (availability === "unavailable") {
+      appendMessage(chatHistory, 'ai', "Sorry, the AI is not available right now. (Status: unavailable). Please check device requirements and Chrome flags.");
+      return;
+    }
+
+    // Optional: Let the user know if a download is happening
+    if (availability === "downloading" || availability === "downloadable") {
+        appendMessage(chatHistory, 'ai', "Preparing the AI model. This may take a moment...");
+    }
+
+    const systemPrompt = `You are a curious beginner student named Feynman Friend. The user is your teacher. Your goal is to understand what they explain. When they explain something, respond by either confirming you understand in a friendly way (e.g., "Oh, that makes perfect sense now! Thank you.") or by asking ONE simple follow-up question if their explanation is still a bit unclear or uses jargon. Keep your responses short and conversational.`;
+    
+    // Use the robust createAiSession function
+    feynmanSession = await createAiSession({systemPrompt});
+
+    const initialAiMessageDiv = appendMessage(chatHistory, 'ai', "Thinking of a question...");
+    
+    const firstUserPrompt = `I'm your teacher. Please read this text I've selected and ask me ONE simple question about the most important or confusing concept to help you understand it better.\n\nText: "${text}"`;
+    
+    const stream = feynmanSession.promptStreaming(firstUserPrompt);
+    let fullResponse = "";
+    for await (const chunk of stream) {
+        fullResponse += chunk;
+        initialAiMessageDiv.textContent = `Feynman Friend: ${fullResponse}`;
+    }
+    
+    // Enable the input form now that the first question has been asked
+    input.disabled = false;
+    button.disabled = false;
+    input.focus();
+
+  } catch (err) {
+    appendMessage(chatHistory, 'ai', `Oops, an error occurred: ${err.message}`);
+  }
+});
